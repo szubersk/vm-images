@@ -1,0 +1,36 @@
+---
+name: "publish-images"
+
+on:
+  schedule:
+  - cron: '0 0 * * *'
+
+jobs:
+  minimal:
+    runs-on: "ubuntu-20.04"
+    strategy:
+      matrix:
+        release: ["stable", "testing", "unstable"]
+    steps:
+    - uses: "actions/checkout@v2"
+    - name: "install dependencies"
+      run: |
+        sudo -E bash -c '
+          apt-get update
+          apt-get install -qy debootstrap
+        '
+    - name: "build"
+      env:
+        RELEASE: "${{ matrix.release }}"
+      run: |
+        sudo -E bash -c '
+          dir="$(mktemp -d)"
+          ./minimal/create_rootfs.sh "${dir}"
+          tar -cpC "${dir}" . | docker import --change "ENTRYPOINT []" --change "CMD [\"/bin/bash\"]" - "ghcr.io/szubersk/debian/${{ matrix.release }}:latest"
+        '
+    - name: "publish"
+      env:
+        RELEASE: "${{ matrix.release }}"
+      run: |
+        docker login --username szubersk --password "${{ secrets.GHCR }}" ghcr.io
+        docker push "ghcr.io/szubersk/debian/${{ matrix.release }}:latest"
