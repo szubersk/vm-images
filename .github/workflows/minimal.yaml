@@ -1,0 +1,32 @@
+---
+name: "minimal"
+
+on:
+  push:
+    paths:
+    - 'minimal/**'
+  pull_request:
+    paths:
+    - 'minimal/**'
+
+jobs:
+  minimal:
+    runs-on: "ubuntu-20.04"
+    strategy:
+      matrix:
+        release: ["stable", "testing", "unstable", "sid"]
+    steps:
+    - uses: "actions/checkout@v2"
+    - name: "install dependencies"
+      run: |
+        sudo -E bash -c '
+          apt-get update
+          apt-get install -qy debootstrap
+        '
+    - name: "create rootfs"
+      env:
+        RELEASE: "${{ matrix.release }}"
+      run: |
+        sudo -E bash -c '
+          ./minimal/create_rootfs.sh "$(mktemp -d)"
+        '
