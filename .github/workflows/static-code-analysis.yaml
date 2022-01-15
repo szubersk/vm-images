@@ -12,11 +12,11 @@ jobs:
     - name: "install dependencies"
       run: |
         sudo -E bash -c '
-          curl -sSLf https://github.com/mvdan/sh/releases/download/v3.4.0/shfmt_v3.4.0_linux_amd64 >/usr/local/bin/shfmt
-          curl -sSLf https://github.com/koalaman/shellcheck/releases/download/v0.7.2/shellcheck-v0.7.2.linux.x86_64.tar.xz | tar -Jx shellcheck-v0.7.2/shellcheck --to-stdout >/usr/local/bin/shellcheck
+          curl -sSLf https://github.com/mvdan/sh/releases/download/v3.4.2/shfmt_v3.4.2_linux_amd64 >/usr/local/bin/shfmt
+          curl -sSLf https://github.com/koalaman/shellcheck/releases/download/v0.8.0/shellcheck-v0.8.0.linux.x86_64.tar.xz | tar -Jx shellcheck-v0.8.0/shellcheck --to-stdout >/usr/local/bin/shellcheck
           chmod 0755 /usr/local/bin/*
         '
     - name: "run static code analysis"
       run: |
-        shellcheck --enable=all --severity=style --check-sourced --external-sources --source-path=SCRIPTDIR $(find . -name '*.sh')
+        shellcheck --format=gcc --enable=all --exclude=SC1090,SC1091,SC2250 $(find . -name '*.sh')
         shfmt -d -i 2 -bn -ci $(find . -name '*.sh')
