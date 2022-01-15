@@ -10,27 +10,24 @@ jobs:
     runs-on: "ubuntu-20.04"
     strategy:
       matrix:
-        release: ["stable", "testing", "unstable"]
+        variant: ["full"]
+        release: ["testing"]
     steps:
     - uses: "actions/checkout@v2"
     - name: "install dependencies"
       run: |
-        sudo -E bash -c '
+        sudo bash -c '
           apt-get update
           apt-get install -qy debootstrap
         '
     - name: "build"
-      env:
-        RELEASE: "${{ matrix.release }}"
       run: |
-        sudo -E bash -c '
-          dir="$(mktemp -d)"
-          ./minimal/create_rootfs.sh "${dir}"
-          tar -cpC "${dir}" . | docker import --change "ENTRYPOINT []" --change "CMD [\"/bin/bash\"]" - "ghcr.io/szubersk/debian/${{ matrix.release }}:latest"
+        sudo bash -c '
+          dir=$(mktemp -d)
+          ./base/create_rootfs.sh --variant ${{ matrix.variant }} --release ${{ matrix.release }} "${dir}"
+          tar -cpC "${dir}" . | docker import --change "ENTRYPOINT []" --change "CMD [\"/bin/bash\"]" - "ghcr.io/szubersk/debian/${{ matrix.release }}:${{ matrix.variant }}"
         '
     - name: "publish"
-      env:
-        RELEASE: "${{ matrix.release }}"
       run: |
         docker login --username szubersk --password "${{ secrets.GHCR }}" ghcr.io
-        docker push "ghcr.io/szubersk/debian/${{ matrix.release }}:latest"
+        docker push "ghcr.io/szubersk/debian/${{ matrix.release }}:${{ matrix.variant }}"
