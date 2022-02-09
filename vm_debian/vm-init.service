@@ -1,0 +1,13 @@
+[Unit]
+Description=Initialize VM
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm_init.sh
+RemainAfterExit=true
+TimeoutStartSec=1min
+
+[Install]
+WantedBy=multi-user.target
+WantedBy=network-online.target

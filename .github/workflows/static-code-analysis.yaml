@@ -18,5 +18,5 @@ jobs:
         '
     - name: "run static code analysis"
       run: |
-        shellcheck --format=gcc --enable=all --exclude=SC1090,SC1091,SC2250 $(find . -name '*.sh')
-        shfmt -d -i 2 -bn -ci $(find . -name '*.sh')
+        find . -name '*.sh' | grep -vFf ./.shellcheck_exclusions | xargs shellcheck --format=gcc --enable=all --exclude=SC1090,SC1091,SC2250,SC3043
+        find . -name '*.sh' | grep -vFf ./.shellcheck_exclusions | xargs shfmt -d -i 2 -bn -ci
