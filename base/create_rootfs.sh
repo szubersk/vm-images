@@ -131,11 +131,11 @@ configure_system() {
   )
 
   {
-    echo "deb http://deb.debian.org/debian ${OPT_RELEASE} main contrib non-free"
+    echo "deb https://deb.debian.org/debian ${OPT_RELEASE} main contrib non-free"
 
     if [[ ${OPT_RELEASE} != unstable ]] && [[ ${OPT_RELEASE} != sid ]]; then
-      echo "deb http://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
-      echo "deb http://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
+      echo "deb https://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
+      echo "deb https://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
     fi
   } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
 
