@@ -1,0 +1,30 @@
+---
+name: "vm-debian"
+
+on:
+  pull_request:
+    paths:
+    - 'vm_debian/**'
+
+jobs:
+  vm-debian:
+    runs-on: "ubuntu-20.04"
+    steps:
+    - uses: "actions/checkout@v2"
+    - name: APT speedup
+      run: |
+        sudo -E bash -c '
+          echo update_initramfs=no >/etc/initramfs-tools/update-initramfs.conf
+          : >/var/lib/dpkg/triggers/File
+        '
+    - name: "install dependencies"
+      run: |
+        sudo -E eatmydata -- bash -c '
+          echo "deb http://azure.archive.ubuntu.com/ubuntu jammy main universe" >>/etc/apt/sources.list
+          apt-get update
+          apt-get -qq -t jammy upgrade btrfs-progs libc6-dev libc-dev-bin
+          apt-get -qq install debootstrap
+        '
+    - name: "build image"
+      run: |
+         sudo -E eatmydata -- ./vm_debian/build_vm_debian.sh "$(sudo mktemp)"
