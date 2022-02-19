@@ -2,7 +2,9 @@
 name: "static-code-analysis"
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+    - '.github/workflows/static-code-analysis.yaml'
 
 jobs:
   static-code-analysis:
@@ -11,7 +13,7 @@ jobs:
     - uses: "actions/checkout@v2"
     - name: "install dependencies"
       run: |
-        sudo -E bash -c '
+        sudo -E eatmydata -- bash -c '
           curl -sSLf https://github.com/mvdan/sh/releases/download/v3.4.2/shfmt_v3.4.2_linux_amd64 >/usr/local/bin/shfmt
           curl -sSLf https://github.com/koalaman/shellcheck/releases/download/v0.8.0/shellcheck-v0.8.0.linux.x86_64.tar.xz | tar -Jx shellcheck-v0.8.0/shellcheck --to-stdout >/usr/local/bin/shellcheck
           chmod 0755 /usr/local/bin/*
