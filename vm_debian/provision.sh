@@ -2,14 +2,20 @@
 
 set -exuo pipefail
 
+export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true LANG=C
+
+if [ "${EATMYDATA:-}" != 1 ]; then
+  apt-get -qq update
+  apt-get -qq install eatmydata
+  exec env EATMYDATA=1 eatmydata -- "${BASH_SOURCE[0]}" "$@"
+fi
+
 umask 0022
 
 echo vm.local >/etc/hostname
 hostname -F /etc/hostname
 
-export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true LANG=C
-apt-get update
-apt-get install -qq \
+apt-get -qq install \
   btrfs-progs \
   doas \
   e2fsprogs \
