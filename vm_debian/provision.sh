@@ -73,12 +73,12 @@ GRUB_TERMINAL="console serial"
 GRUB_TIMEOUT=1
 EOF
 
-mount -t devtmpfs devtmpfs /dev
-mount -t proc proc /proc
-mount -t sysfs sysfs /sys
+trap 'trap "" ABRT HUP INT PIPE QUIT TERM EXIT; umount -R /dev /sys /proc' EXIT
+mount --make-private -t devtmpfs devtmpfs /dev
+mount --make-private -t proc proc /proc
+mount --make-private -t sysfs sysfs /sys
 uuid=$(grub-probe -t fs_uuid /)
 echo "UUID=$uuid / btrfs autodefrag,compress=zstd,noatime,user_subvol_rm_allowed" >/etc/fstab
 update-grub2
 disk=$(grub-probe -t disk /)
 grub-install --target=i386-pc --recheck "$disk"
-umount -R /dev /sys /proc
