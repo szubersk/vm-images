@@ -107,12 +107,15 @@ install_packages() {
   gpg --import --keyring "${WORK_DIR}/keyring" --no-default-keyring "${WORK_DIR}/archive-key-11.asc"
 
   if [[ ${OPT_VARIANT} = "minimal" ]]; then
-    debootstrap --keyring="${WORK_DIR}/keyring" --variant=minbase --force-check-gpg \
-      --include=ca-certificates,busybox-static --exclude=e2fsprogs,tzdata \
+    $(command -v eatmydata ||:) debootstrap --keyring="${WORK_DIR}/keyring" \
+      --variant=minbase --force-check-gpg \
+      --include=ca-certificates,busybox-static \
+      --exclude=e2fsprogs,tzdata \
       "${OPT_RELEASE}" "${OPT_INSTALL_DIR}"
   else
-    debootstrap --keyring="${WORK_DIR}/keyring" --force-check-gpg \
-      --include=ca-certificates,vim-tiny --exclude=e2fsprogs,tzdata \
+    $(command -v eatmydata ||:) debootstrap --keyring="${WORK_DIR}/keyring" \
+      --force-check-gpg --include=ca-certificates,vim-tiny \
+      --exclude=e2fsprogs,tzdata \
       "${OPT_RELEASE}" "${OPT_INSTALL_DIR}"
   fi
 }
