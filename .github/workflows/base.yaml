@@ -4,6 +4,7 @@ name: "base"
 on:
   pull_request:
     paths:
+    - '.github/workflows/base.yaml'
     - 'base/**'
 
 jobs:
@@ -15,14 +16,20 @@ jobs:
         release: ["stable", "testing", "unstable"]
     steps:
     - uses: "actions/checkout@v2"
+    - name: APT speedup
+      run: |
+        sudo -E eatmydata -- bash -c '
+          echo update_initramfs=no >/etc/initramfs-tools/update-initramfs.conf
+          : >/var/lib/dpkg/triggers/File
+        '
     - name: "install dependencies"
       run: |
-        sudo bash -c '
-          apt-get update
-          apt-get install -qy debootstrap
+        sudo -E eatmydata -- bash -c '
+          apt-get -qq update
+          apt-get -qq install debootstrap
         '
     - name: "create rootfs"
       run: |
-        sudo bash -c '
+        sudo -E eatmydata -- bash -c '
           ./base/create_rootfs.sh --variant ${{ matrix.variant }} --release ${{ matrix.release }} "$(mktemp -d)"
         '
