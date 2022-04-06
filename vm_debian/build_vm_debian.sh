@@ -8,6 +8,9 @@ fi
 
 SCRIPT_DIR=$(readlink -e "$(dirname "${BASH_SOURCE[0]}")")
 
+OPT_RELEASE=stable
+OPT_IMAGE_FILE=
+
 TO_RELEASE=()
 TO_REMOVE=()
 MOUNT_POINT=
@@ -40,6 +43,43 @@ cleanup() {
   rm -rf "${TO_REMOVE[@]}"
 }
 
+usage() {
+  echo "Usage: ${BASH_SOURCE[0]} [--release <stable|testing|unstable>] <image file>"
+  exit 1
+}
+
+parse_command_line_arguments() {
+  local args
+  args=$(getopt -n "${BASH_SOURCE[0]}" -o '' --longoptions 'release:,help' -- "$@")
+  eval "set -- $args"
+  while :; do
+    case $1 in
+      --release)
+        case $2 in
+          bullseye | stable | bookworm | testing | sid | unstable)
+            OPT_RELEASE="$2"
+            ;;  
+          *)  
+            usage
+            ;;  
+        esac
+        shift 2
+        ;;  
+      --) 
+        if [[ -z ${2:-} ]]; then
+          usage
+        fi  
+
+        OPT_IMAGE_FILE="$2"
+        break
+        ;;  
+      *)  
+        usage
+        ;;  
+    esac
+  done
+}
+
 create_partitions_and_fs() {
   local disk_image=$1
   truncate -s 2G "$disk_image"
@@ -60,7 +100,7 @@ create_partitions_and_fs() {
 }
 
 install_base_os() {
-  "$SCRIPT_DIR/../base/create_rootfs.sh" "$MOUNT_POINT"
+  "$SCRIPT_DIR/../base/create_rootfs.sh" --release "$OPT_RELEASE" "$MOUNT_POINT"
 
   install -o 0 -g 0 -m 0644 /etc/resolv.conf "$MOUNT_POINT/etc/resolv.conf"
   install -o 0 -g 0 -m 0644 "$SCRIPT_DIR/vm-init.service" "$MOUNT_POINT/etc/systemd/system/vm-init.service"
@@ -74,6 +114,7 @@ install_base_os() {
 
 main() {
   install_signal_handlers
+  parse_command_line_arguments "$@"
 
   if [[ ${UNSHARED:-} != 1 ]]; then
     if [[ $(id -u || :) != 0 ]]; then
@@ -84,11 +125,10 @@ main() {
     exec env UNSHARED=1 unshare --mount --mount-proc --uts "${BASH_SOURCE[0]}" "$@"
   fi
 
-  local disk_image=$1
-  create_partitions_and_fs "$disk_image"
+  create_partitions_and_fs "$OPT_IMAGE_FILE"
   install_base_os
 
-  echo "$disk_image built OK"
+  echo "$OPT_IMAGE_FILE built OK"
 }
 
 main "$@"
