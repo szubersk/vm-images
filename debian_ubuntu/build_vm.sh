@@ -2,9 +2,7 @@
 
 set -euo pipefail
 
-if [[ ${V:-} = 1 ]]; then
-  set -x
-fi
+[[ ${V-} != 1 ]] || set -x
 
 SCRIPT_DIR=$(readlink -e "$(dirname "${BASH_SOURCE[0]}")")
 
@@ -44,7 +42,7 @@ cleanup() {
 }
 
 usage() {
-  echo "Usage: ${BASH_SOURCE[0]} [--release <stable|testing|unstable>] <image file>"
+  echo "Usage: ${BASH_SOURCE[0]} [--release <stable|testing|unstable|focal|jammy|kinetic>] <image file>"
   exit 1
 }
 
@@ -55,27 +53,23 @@ parse_command_line_arguments() {
   while :; do
     case $1 in
       --release)
-        case $2 in
-          bullseye | stable | bookworm | testing | sid | unstable)
-            OPT_RELEASE="$2"
-            ;;  
-          *)  
-            usage
-            ;;  
-        esac
-        shift 2
-        ;;  
-      --) 
         if [[ -z ${2:-} ]]; then
           usage
-        fi  
+        fi
+        OPT_RELEASE="$2"
+        shift 2
+        ;;
+      --)
+        if [[ -z ${2:-} ]]; then
+          usage
+        fi
 
         OPT_IMAGE_FILE="$2"
         break
-        ;;  
-      *)  
+        ;;
+      *)
         usage
-        ;;  
+        ;;
     esac
   done
 }
@@ -100,7 +94,7 @@ create_partitions_and_fs() {
 }
 
 install_base_os() {
-  "$SCRIPT_DIR/../base/create_rootfs.sh" --release "$OPT_RELEASE" "$MOUNT_POINT"
+  "$SCRIPT_DIR/build_chroot.sh" --release "$OPT_RELEASE" "$MOUNT_POINT"
 
   install -o 0 -g 0 -m 0644 /etc/resolv.conf "$MOUNT_POINT/etc/resolv.conf"
   install -o 0 -g 0 -m 0644 "$SCRIPT_DIR/vm-init.service" "$MOUNT_POINT/etc/systemd/system/vm-init.service"

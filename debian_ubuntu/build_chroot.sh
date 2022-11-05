@@ -2,11 +2,8 @@
 
 set -euo pipefail
 
-if [[ ${V:-} = 1 ]]; then
-  set -x
-fi
+[[ ${V-} != 1 ]] || set -x
 
-SCRIPT_DIR=$(readlink -e "$(dirname "${BASH_SOURCE[0]}")")
 WORK_DIR=$(mktemp -d)
 
 OPT_VARIANT=full
@@ -29,15 +26,12 @@ disable_signal_handlers() {
 cleanup() {
   set +e
   disable_signal_handlers
-  rm -rf "${WORK_DIR}"
-
-  if [[ $1 != 0 ]]; then
-    rm -rf "${OPT_INSTALL_DIR}"
-  fi
+  rm -rf "$WORK_DIR" 2>/dev/null
+  [[ $1 -eq 0 ]] || rm -rf "$OPT_INSTALL_DIR" 2>/dev/null
 }
 
 usage() {
-  echo "Usage: ${BASH_SOURCE[0]} [--variant <minimal|nodoc|full>] [--release <stable|testing|unstable>] <installation directory>"
+  echo "Usage: ${BASH_SOURCE[0]} [--variant <minimal|nodoc|full>] [--release <bullseye|stable|bookworm|testing|sid|unstable|focal|jammy|kinetic>] <installation directory>"
   exit 1
 }
 
@@ -60,7 +54,7 @@ parse_command_line_arguments() {
         ;;
       --release)
         case $2 in
-          bullseye | stable | bookworm | testing | sid | unstable)
+          bullseye | stable | bookworm | testing | sid | unstable | focal | jammy | kinetic)
             OPT_RELEASE="$2"
             ;;
           *)
@@ -70,7 +64,7 @@ parse_command_line_arguments() {
         shift 2
         ;;
       --)
-        if [[ -z ${2:-} ]]; then
+        if [[ -z ${2-} ]]; then
           usage
         fi
 
@@ -85,13 +79,13 @@ parse_command_line_arguments() {
 }
 
 prepare_installation_directory() {
-  mkdir -p "${OPT_INSTALL_DIR}"{/etc/dpkg/dpkg.cfg.d,/etc/apt}
+  mkdir -p "$OPT_INSTALL_DIR"{/etc/dpkg/dpkg.cfg.d,/etc/apt}
   echo 'force-unsafe-io' >"${OPT_INSTALL_DIR}/etc/dpkg/dpkg.cfg.d/force_unsafe_io"
 
   {
     echo "APT::Default-Release \"${OPT_RELEASE}\";"
 
-    if [[ ${OPT_VARIANT} = "minimal" ]]; then
+    if [[ $OPT_VARIANT == minimal ]]; then
       echo "APT::Install-Recommends \"0\";"
     else
       echo "APT::Install-Recommends \"1\";"
@@ -102,21 +96,21 @@ prepare_installation_directory() {
 }
 
 install_packages() {
-  wget --no-verbose --output-document "${WORK_DIR}/archive-key-11.asc" https://ftp-master.debian.org/keys/archive-key-11.asc
-  (cd "${WORK_DIR}" && sha256sum --check --strict "${SCRIPT_DIR}/SHA256SUMS")
-  gpg --import --keyring "${WORK_DIR}/keyring" --no-default-keyring "${WORK_DIR}/archive-key-11.asc"
+  gpg --homedir "$WORK_DIR" --keyring "${WORK_DIR}/keyring" \
+    --no-default-keyring --keyserver hkps://keyserver.ubuntu.com \
+    --recv-keys 0x73A4F27B8DD47936 0x871920D1991BC93C
 
-  if [[ ${OPT_VARIANT} = "minimal" ]]; then
-    $(command -v eatmydata ||:) debootstrap --keyring="${WORK_DIR}/keyring" \
+  if [[ $OPT_VARIANT == minimal ]]; then
+    $(command -v eatmydata || :) debootstrap --keyring="${WORK_DIR}/keyring" \
       --variant=minbase --force-check-gpg \
       --include=ca-certificates,busybox-static \
       --exclude=e2fsprogs,tzdata \
-      "${OPT_RELEASE}" "${OPT_INSTALL_DIR}"
+      "$OPT_RELEASE" "$OPT_INSTALL_DIR"
   else
-    $(command -v eatmydata ||:) debootstrap --keyring="${WORK_DIR}/keyring" \
-      --force-check-gpg --include=ca-certificates,vim-tiny \
+    $(command -v eatmydata || :) debootstrap --keyring="${WORK_DIR}/keyring" \
+      --force-check-gpg --include=ca-certificates,eatmydata,vim-tiny \
       --exclude=e2fsprogs,tzdata \
-      "${OPT_RELEASE}" "${OPT_INSTALL_DIR}"
+      "$OPT_RELEASE" "$OPT_INSTALL_DIR"
   fi
 }
 
@@ -133,16 +127,24 @@ configure_system() {
     /usr/share/locale
   )
 
-  {
-    echo "deb https://deb.debian.org/debian ${OPT_RELEASE} main contrib non-free"
+  if [[ $OPT_RELEASE == focal || $OPT_RELEASE == jammy || $OPT_RELEASE == kinetic ]]; then
+    {
+      echo "deb http://archive.ubuntu.com/ubuntu $OPT_RELEASE main restricted universe multiverse"
+      echo "deb http://security.ubuntu.com/ubuntu ${OPT_RELEASE}-security main restricted universe multiverse"
+      echo "deb http://archive.ubuntu.com/ubuntu ${OPT_RELEASE}-updates main restricted universe multiverse"
+    } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
+  else
+    {
+      echo "deb https://deb.debian.org/debian $OPT_RELEASE main contrib non-free"
 
-    if [[ ${OPT_RELEASE} != unstable ]] && [[ ${OPT_RELEASE} != sid ]]; then
-      echo "deb https://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
-      echo "deb https://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
-    fi
-  } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
+      if [[ $OPT_RELEASE != unstable ]] && [[ $OPT_RELEASE != sid ]]; then
+        echo "deb https://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
+        echo "deb https://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
+      fi
+    } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
+  fi
 
-  if [[ ${OPT_VARIANT} != "full" ]]; then
+  if [[ $OPT_VARIANT != full ]]; then
     for p in "${doc_dirs[@]}" "${locale_dirs[@]}"; do
       printf "path-exclude=%s/*\n" "${p}" >>"${OPT_INSTALL_DIR}/etc/dpkg/dpkg.cfg.d/nodoc"
       rm -rf "${OPT_INSTALL_DIR:?}/${p}/"*
@@ -162,9 +164,9 @@ main() {
   prepare_installation_directory
   install_packages
   configure_system
-  sync -f "${OPT_INSTALL_DIR}"
+  sync -f "$OPT_INSTALL_DIR"
 
-  echo "${OPT_RELEASE} installed successfully in ${OPT_INSTALL_DIR}"
+  echo "$OPT_RELEASE installed successfully in $OPT_INSTALL_DIR"
 }
 
 main "$@"
