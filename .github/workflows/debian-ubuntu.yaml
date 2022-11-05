@@ -1,19 +1,19 @@
 ---
-name: "base"
+name: "Debian / Ubuntu"
 
-on:
+"on":
   pull_request:
     paths:
-    - '.github/workflows/base.yaml'
-    - 'base/**'
+    - '.github/workflows/debian_ubuntu.yaml'
+    - 'debian_ubuntu/**'
 
 jobs:
-  base:
-    runs-on: "ubuntu-20.04"
+  build-vm:
+    runs-on: "ubuntu-22.04"
     strategy:
       matrix:
-        variant: ["minimal", "nodoc", "full"]
-        release: ["stable", "testing", "unstable"]
+        release: ["sid", "kinetic"]
+
     steps:
     - uses: "actions/checkout@v2"
     - name: APT speedup
@@ -26,10 +26,8 @@ jobs:
       run: |
         sudo -E eatmydata -- bash -c '
           apt-get -qq update
-          apt-get -qq install debootstrap
+          apt-get -qq install btrfs-progs debootstrap
         '
-    - name: "create rootfs"
+    - name: "build image"
       run: |
-        sudo -E eatmydata -- bash -c '
-          ./base/create_rootfs.sh --variant ${{ matrix.variant }} --release ${{ matrix.release }} "$(mktemp -d)"
-        '
+         sudo -E eatmydata -- ./debian_ubuntu/build_vm.sh --release ${{ matrix.release }} "$(sudo mktemp)"

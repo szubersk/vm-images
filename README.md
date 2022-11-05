@@ -1,1 +1,1 @@
-# debian-images
+# vm-images
