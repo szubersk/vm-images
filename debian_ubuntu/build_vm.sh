@@ -28,6 +28,7 @@ disable_signal_handlers() {
 
 cleanup() {
   set +e
+  local result=$1
   disable_signal_handlers
 
   pkill -9 -P $$ &>/dev/null
@@ -39,6 +40,7 @@ cleanup() {
   done
 
   rm -rf "${TO_REMOVE[@]}"
+  [[ $result -eq 0 ]] || rm -f "$OPT_IMAGE_FILE"
 }
 
 usage() {
