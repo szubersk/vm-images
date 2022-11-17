@@ -83,6 +83,7 @@ create_partitions_and_fs() {
 
   local loop_dev
   loop_dev=$(losetup -Pf --show "$disk_image")
+  partprobe "$loop_dev"
   TO_RELEASE+=("$loop_dev")
   MOUNT_POINT=$(mktemp -d)
   TO_REMOVE+=("$MOUNT_POINT")
