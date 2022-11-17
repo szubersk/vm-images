@@ -55,14 +55,14 @@ parse_command_line_arguments() {
   while :; do
     case $1 in
       --release)
-        if [[ -z ${2:-} ]]; then
+        if [[ -z ${2-} ]]; then
           usage
         fi
         OPT_RELEASE="$2"
         shift 2
         ;;
       --)
-        if [[ -z ${2:-} ]]; then
+        if [[ -z ${2-} ]]; then
           usage
         fi
 
@@ -104,7 +104,7 @@ install_base_os() {
   install -o 0 -g 0 -m 0755 "$SCRIPT_DIR/provision.sh" "$MOUNT_POINT/provision.sh"
 
   env -i HOME=/root TERM="$TERM" PATH='/usr/sbin:/usr/bin' \
-    http_proxy="${http_proxy:-}" https_proxy="${https_proxy:-}" no_proxy="${no_proxy:-}" \
+    http_proxy="${http_proxy-}" https_proxy="${https_proxy-}" no_proxy="${no_proxy-}" \
     chroot "$MOUNT_POINT" /provision.sh
 }
 
@@ -112,7 +112,7 @@ main() {
   install_signal_handlers
   parse_command_line_arguments "$@"
 
-  if [[ ${UNSHARED:-} != 1 ]]; then
+  if [[ ${UNSHARED-} != 1 ]]; then
     if [[ $(id -u || :) != 0 ]]; then
       echo >&2 "Please run as root!"
       exit 1
