@@ -4,6 +4,7 @@ name: "static-code-analysis"
 "on":
   pull_request:
     paths:
+    - 'debian_ubuntu/**'
     - '.github/workflows/static-code-analysis.yaml'
 
 jobs:

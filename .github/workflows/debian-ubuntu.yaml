@@ -4,15 +4,17 @@ name: "Debian / Ubuntu"
 "on":
   pull_request:
     paths:
-    - '.github/workflows/debian_ubuntu.yaml'
     - 'debian_ubuntu/**'
+    - '.github/workflows/debian_ubuntu.yaml'
 
 jobs:
   build-vm:
     runs-on: "ubuntu-22.04"
     strategy:
+      fail-fast: false
       matrix:
-        release: ["sid", "kinetic"]
+        arch: ["amd64", "arm64"]
+        release: ["jammy", "focal", "unstable", "stable"]
 
     steps:
     - uses: "actions/checkout@v2"
@@ -26,8 +28,8 @@ jobs:
       run: |
         sudo -E eatmydata -- bash -c '
           apt-get -qq update
-          apt-get -qq install btrfs-progs debootstrap
+          apt-get -qq install --no-install-recommends --no-install-suggests btrfs-progs debootstrap qemu-user-static
         '
     - name: "build image"
       run: |
-         sudo -E eatmydata -- ./debian_ubuntu/build_vm.sh --release ${{ matrix.release }} "$(sudo mktemp)"
+         sudo -E eatmydata -- ./debian_ubuntu/build_vm.sh --arch ${{ matrix.arch }} --release ${{ matrix.release }} "$(sudo mktemp)"
