@@ -7,7 +7,8 @@ set -euo pipefail
 WORK_DIR=$(mktemp -d)
 
 OPT_VARIANT=full
-OPT_RELEASE=testing
+OPT_ARCH=$(dpkg --print-architecture)
+OPT_RELEASE=unstable
 OPT_INSTALL_DIR=
 
 install_signal_handlers() {
@@ -31,13 +32,13 @@ cleanup() {
 }
 
 usage() {
-  echo "Usage: ${BASH_SOURCE[0]} [--variant <minimal|nodoc|full>] [--release <bullseye|stable|bookworm|testing|sid|unstable|focal|jammy|kinetic>] <installation directory>"
+  echo "Usage: ${BASH_SOURCE[0]} [--arch <amd64|arm64|...>] [--variant <minimal|nodoc|full>] [--release <stable|testing|unstable|focal|jammy|...>] <installation directory>"
   exit 1
 }
 
 parse_command_line_arguments() {
   local args
-  args=$(getopt -n "${BASH_SOURCE[0]}" -o '' --longoptions 'variant:,release:,help' -- "$@")
+  args=$(getopt -n "${BASH_SOURCE[0]}" -o '' --longoptions 'arch:,variant:,release:,help' -- "$@")
   eval "set -- $args"
   while :; do
     case $1 in
@@ -52,15 +53,12 @@ parse_command_line_arguments() {
         esac
         shift 2
         ;;
+      --arch)
+        OPT_ARCH="$2"
+        shift 2
+        ;;
       --release)
-        case $2 in
-          bullseye | stable | bookworm | testing | sid | unstable | focal | jammy | kinetic)
-            OPT_RELEASE="$2"
-            ;;
-          *)
-            usage
-            ;;
-        esac
+        OPT_RELEASE="$2"
         shift 2
         ;;
       --)
@@ -83,15 +81,20 @@ prepare_installation_directory() {
   echo 'force-unsafe-io' >"${OPT_INSTALL_DIR}/etc/dpkg/dpkg.cfg.d/force_unsafe_io"
 
   {
+    echo "APT::AutoRemove::SuggestsImportant \"false\";"
     echo "APT::Default-Release \"${OPT_RELEASE}\";"
-
     if [[ $OPT_VARIANT == minimal ]]; then
       echo "APT::Install-Recommends \"0\";"
     else
       echo "APT::Install-Recommends \"1\";"
     fi
     echo "APT::Install-Suggests \"0\";"
-    echo "Acquire::Languages none;"
+    echo "APT::Update::Post-Invoke { \"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\"; };"
+    echo "Acquire::GzipIndexes \"true\";"
+    echo "Acquire::Languages \"none\";"
+    echo "DPkg::Post-Invoke { \"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\"; };"
+    echo "Dir::Cache::pkgcache \"\";"
+    echo "Dir::Cache::srcpkgcache \"\";"
   } >"${OPT_INSTALL_DIR}/etc/apt/apt.conf"
 }
 
@@ -102,14 +105,15 @@ install_packages() {
 
   if [[ $OPT_VARIANT == minimal ]]; then
     $(command -v eatmydata || :) debootstrap --keyring="${WORK_DIR}/keyring" \
+      --arch="$OPT_ARCH" \
       --variant=minbase --force-check-gpg \
       --include=ca-certificates,busybox-static \
       --exclude=e2fsprogs,tzdata \
       "$OPT_RELEASE" "$OPT_INSTALL_DIR"
   else
     $(command -v eatmydata || :) debootstrap --keyring="${WORK_DIR}/keyring" \
+      --arch="$OPT_ARCH" \
       --force-check-gpg --include=ca-certificates,eatmydata,vim-tiny \
-      --exclude=e2fsprogs,tzdata \
       "$OPT_RELEASE" "$OPT_INSTALL_DIR"
   fi
 }
@@ -127,20 +131,32 @@ configure_system() {
     /usr/share/locale
   )
 
-  if [[ $OPT_RELEASE == focal || $OPT_RELEASE == jammy || $OPT_RELEASE == kinetic ]]; then
+  if [[ $OPT_RELEASE != stable && $OPT_RELEASE != testing && $OPT_RELEASE != unstable ]]; then
     {
-      echo "deb http://archive.ubuntu.com/ubuntu $OPT_RELEASE main restricted universe multiverse"
-      echo "deb http://security.ubuntu.com/ubuntu ${OPT_RELEASE}-security main restricted universe multiverse"
-      echo "deb http://archive.ubuntu.com/ubuntu ${OPT_RELEASE}-updates main restricted universe multiverse"
+      if [[ $OPT_ARCH == i386 || $OPT_ARCH == amd64 ]]; then
+        echo "deb http://archive.ubuntu.com/ubuntu $OPT_RELEASE main restricted universe multiverse"
+        echo "deb http://archive.ubuntu.com/ubuntu ${OPT_RELEASE}-updates main restricted universe multiverse"
+        echo "deb http://security.ubuntu.com/ubuntu ${OPT_RELEASE}-security main restricted universe multiverse"
+      else
+        echo "deb http://ports.ubuntu.com/ubuntu-ports $OPT_RELEASE main restricted universe multiverse"
+        echo "deb http://ports.ubuntu.com/ubuntu-ports ${OPT_RELEASE}-security main restricted universe multiverse"
+        echo "deb http://ports.ubuntu.com/ubuntu-ports ${OPT_RELEASE}-updates main restricted universe multiverse"
+      fi
     } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
+  elif [[ $OPT_RELEASE == unstable ]]; then
+    {
+      echo "Types: deb"
+      echo "URIs: http://deb.debian.org/debian"
+      echo "Suites: $OPT_RELEASE"
+      echo "Components: main contrib non-free non-free-firmware"
+      echo "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg"
+    } >"${OPT_INSTALL_DIR}/etc/apt/sources.list.d/debian.sources"
+    rm -f "${OPT_INSTALL_DIR}/etc/apt/sources.list"
   else
     {
-      echo "deb https://deb.debian.org/debian $OPT_RELEASE main contrib non-free"
-
-      if [[ $OPT_RELEASE != unstable ]] && [[ $OPT_RELEASE != sid ]]; then
-        echo "deb https://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
-        echo "deb https://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
-      fi
+      echo "deb http://deb.debian.org/debian $OPT_RELEASE main contrib non-free"
+      echo "deb http://security.debian.org/debian-security ${OPT_RELEASE}-security main contrib non-free"
+      echo "deb http://deb.debian.org/debian ${OPT_RELEASE}-updates main contrib non-free"
     } >"${OPT_INSTALL_DIR}/etc/apt/sources.list"
   fi
 
@@ -153,7 +169,7 @@ configure_system() {
 
   echo 'nameserver 1.0.0.1' >"${OPT_INSTALL_DIR}/etc/resolv.conf"
 
-  rm -rf "${OPT_INSTALL_DIR:?}"{/var/cache/apt,/var/lib/apt/lists}/*
+  rm -rf "${OPT_INSTALL_DIR:?}"{/var/cache/apt,/var/lib/apt/lists}/* "${OPT_INSTALL_DIR:?}"/var/log/bootstrap.log
 }
 
 main() {
